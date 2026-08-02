@@ -22,6 +22,7 @@ repositories {
         url = 'https://maven.gtceu.com'
         content {
             includeGroup 'com.gregtechceu.gtceu'
+            includeGroup 'brachy.modularui'
         }
     }
     maven {
@@ -74,6 +75,13 @@ repositories {
         content {
             includeGroup 'appeng'
         }
+    }
+    exclusiveContent { // Configuration
+        forRepositories(
+                maven { url = "https://repo.repsy.io/mvn/toma/public/" },
+                maven { url = "https://api.repsy.io/mvn/toma/public" },
+        )
+        filter { includeGroup("dev.toma.configuration") }
     }
 }
 
@@ -147,11 +155,11 @@ dependencies {
 
     // GregTech and dependencies
     modImplementation("com.gregtechceu.gtceu:gtceu-${minecraft_version}:${gtceu_version}:slim") { transitive = false }
-    modImplementation("com.lowdragmc.ldlib:ldlib-forge-${minecraft_version}:${ldlib_version}") { transitive = false }
+    modImplementation("brachy.modularui:modularui-mc${minecraft_version}:${mui_version}:slim") { transitive = false }
     modImplementation("com.tterrag.registrate:Registrate:${registrate_version}")
     modImplementation("dev.latvian.mods:kubejs-forge:${kubejs_version}")
     modImplementation("dev.latvian.mods:rhino-forge:${rhino_version}")
-    modImplementation("dev.toma.configuration:configuration-forge-${minecraft_version}:${configuration_version}")
+    modImplementation("dev.toma.configuration:configuration-${project.minecraft_version}:${configuration_version}")
     modRuntimeOnly("dev.architectury:architectury-forge:${architectury_version}")
     modImplementation("appeng:appliedenergistics2-forge:${appeng_version}")
 
