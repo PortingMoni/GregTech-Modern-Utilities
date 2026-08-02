@@ -1,43 +1,31 @@
 package net.neganote.gtutilities.common.machine.multiblock;
 
-import com.gregtechceu.gtceu.api.capability.IControllable;
+import com.gregtechceu.gtceu.api.blockentity.BlockEntityCreationInfo;
 import com.gregtechceu.gtceu.api.capability.IEnergyContainer;
 import com.gregtechceu.gtceu.api.capability.recipe.EURecipeCapability;
 import com.gregtechceu.gtceu.api.capability.recipe.IO;
-import com.gregtechceu.gtceu.api.gui.GuiTextures;
-import com.gregtechceu.gtceu.api.gui.fancy.ConfiguratorPanel;
-import com.gregtechceu.gtceu.api.gui.fancy.FancyMachineUIWidget;
-import com.gregtechceu.gtceu.api.gui.fancy.IFancyConfigurator;
 import com.gregtechceu.gtceu.api.machine.ConditionalSubscriptionHandler;
-import com.gregtechceu.gtceu.api.machine.IMachineBlockEntity;
 import com.gregtechceu.gtceu.api.machine.MetaMachine;
-import com.gregtechceu.gtceu.api.machine.feature.IExplosionMachine;
-import com.gregtechceu.gtceu.api.machine.feature.IFancyUIMachine;
-import com.gregtechceu.gtceu.api.machine.feature.multiblock.IDisplayUIMachine;
-import com.gregtechceu.gtceu.api.machine.feature.multiblock.IMultiPart;
+import com.gregtechceu.gtceu.api.machine.mui.MachineUIPanelBuilder;
 import com.gregtechceu.gtceu.api.machine.multiblock.PartAbility;
 import com.gregtechceu.gtceu.api.machine.multiblock.WorkableElectricMultiblockMachine;
-import com.gregtechceu.gtceu.api.machine.trait.NotifiableFluidTank;
-import com.gregtechceu.gtceu.api.machine.trait.RecipeLogic;
+import com.gregtechceu.gtceu.api.machine.multiblock.part.MultiblockPartMachine;
+import com.gregtechceu.gtceu.api.machine.trait.notifiable.NotifiableFluidTank;
+import com.gregtechceu.gtceu.api.machine.trait.recipe.RecipeLogic;
 import com.gregtechceu.gtceu.api.misc.EnergyContainerList;
-import com.gregtechceu.gtceu.api.pattern.TraceabilityPredicate;
-import com.gregtechceu.gtceu.api.pattern.error.PatternError;
+import com.gregtechceu.gtceu.api.multiblock.PatternPredicate;
+import com.gregtechceu.gtceu.api.multiblock.error.PatternStringError;
 import com.gregtechceu.gtceu.api.recipe.ingredient.FluidIngredient;
+import com.gregtechceu.gtceu.api.sync_system.annotations.SaveField;
+import com.gregtechceu.gtceu.api.sync_system.annotations.SyncToClient;
 import com.gregtechceu.gtceu.common.data.GTItems;
 import com.gregtechceu.gtceu.common.data.GTRecipeCapabilities;
 import com.gregtechceu.gtceu.common.machine.multiblock.part.EnergyHatchPartMachine;
 import com.gregtechceu.gtceu.common.machine.multiblock.part.LaserHatchPartMachine;
+import com.gregtechceu.gtceu.common.mui.widgets.PopupPanel;
 import com.gregtechceu.gtceu.config.ConfigHolder;
 import com.gregtechceu.gtceu.utils.FormattingUtil;
 import com.gregtechceu.gtceu.utils.GTUtil;
-
-import com.lowdragmc.lowdraglib.gui.modular.ModularUI;
-import com.lowdragmc.lowdraglib.gui.texture.IGuiTexture;
-import com.lowdragmc.lowdraglib.gui.texture.ItemStackTexture;
-import com.lowdragmc.lowdraglib.gui.widget.*;
-import com.lowdragmc.lowdraglib.syncdata.annotation.DescSynced;
-import com.lowdragmc.lowdraglib.syncdata.annotation.Persisted;
-import com.lowdragmc.lowdraglib.syncdata.field.ManagedFieldHolder;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -46,92 +34,93 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.Block;
 import net.neganote.gtutilities.common.materials.UtilMaterials;
 import net.neganote.gtutilities.config.UtilConfig;
 import net.neganote.gtutilities.utils.EnergyUtils;
 
+import brachy.modularui.api.IPanelHandler;
+import brachy.modularui.api.drawable.Text;
+import brachy.modularui.api.widget.IWidget;
+import brachy.modularui.drawable.ItemDrawable;
+import brachy.modularui.factory.PosGuiData;
+import brachy.modularui.screen.UISettings;
+import brachy.modularui.value.sync.BooleanSyncValue;
+import brachy.modularui.value.sync.IntSyncValue;
+import brachy.modularui.value.sync.LongSyncValue;
+import brachy.modularui.value.sync.PanelSyncManager;
+import brachy.modularui.value.sync.StringSyncValue;
+import brachy.modularui.widgets.ButtonWidget;
+import brachy.modularui.widgets.textfield.TextFieldWidget;
+import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.datafixers.util.Pair;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
+import java.util.function.Supplier;
 
-import static com.gregtechceu.gtceu.api.pattern.Predicates.abilities;
+import static com.gregtechceu.gtceu.api.multiblock.Predicates.abilities;
+import static com.gregtechceu.gtceu.utils.GTUtil.doExplosion;
 
 // A lot of this is copied from the Active Transformer
-public class WEBHubMachine extends WorkableElectricMultiblockMachine
-                           implements IControllable, IExplosionMachine, IFancyUIMachine,
-                           IDisplayUIMachine {
-
-    protected static final ManagedFieldHolder MANAGED_FIELD_HOLDER = new ManagedFieldHolder(
-            WEBHubMachine.class, WorkableElectricMultiblockMachine.MANAGED_FIELD_HOLDER);
+public class WEBHubMachine extends WorkableElectricMultiblockMachine {
 
     public static Map<Integer, Set<Pair<ResourceLocation, BlockPos>>> ENERGY_INPUTS = new HashMap<>();
     public static Map<Integer, Set<Pair<ResourceLocation, BlockPos>>> ENERGY_OUTPUTS = new HashMap<>();
 
-    public static void addEnergyInputs(int freq, List<IMultiPart> parts) {
+    public static void addEnergyInputs(int freq, List<MultiblockPartMachine> parts) {
         Set<Pair<ResourceLocation, BlockPos>> inputPairs = ENERGY_INPUTS.computeIfAbsent(freq,
                 (f) -> new HashSet<>());
-        for (IMultiPart part : parts) {
-            if (part instanceof MetaMachine machine) {
-                ServerLevel level = (ServerLevel) machine.getLevel();
-                assert level != null;
-                ResourceLocation dimension = level.dimension().location();
-                BlockPos pos = machine.getPos();
-                Pair<ResourceLocation, BlockPos> pair = new Pair<>(dimension, pos);
-                inputPairs.add(pair);
-            }
+        for (MultiblockPartMachine part : parts) {
+            ServerLevel level = (ServerLevel) part.getLevel();
+            assert level != null;
+            ResourceLocation dimension = level.dimension().location();
+            BlockPos pos = part.getBlockPos();
+            Pair<ResourceLocation, BlockPos> pair = new Pair<>(dimension, pos);
+            inputPairs.add(pair);
         }
         ENERGY_INPUTS.put(freq, inputPairs);
     }
 
-    public static void removeEnergyInputs(int freq, List<IMultiPart> parts) {
+    public static void removeEnergyInputs(int freq, List<MultiblockPartMachine> parts) {
         Set<Pair<ResourceLocation, BlockPos>> inputPairs = ENERGY_INPUTS.computeIfAbsent(freq,
                 (f) -> new HashSet<>());
-        for (IMultiPart part : parts) {
-            if (part instanceof MetaMachine machine) {
-                ServerLevel level = (ServerLevel) machine.getLevel();
-                assert level != null;
-                ResourceLocation dimension = level.dimension().location();
-                BlockPos pos = machine.getPos();
-                Pair<ResourceLocation, BlockPos> pair = new Pair<>(dimension, pos);
-                inputPairs.remove(pair);
-            }
+        for (MultiblockPartMachine part : parts) {
+            ServerLevel level = (ServerLevel) part.getLevel();
+            assert level != null;
+            ResourceLocation dimension = level.dimension().location();
+            BlockPos pos = part.getBlockPos();
+            Pair<ResourceLocation, BlockPos> pair = new Pair<>(dimension, pos);
+            inputPairs.remove(pair);
         }
         ENERGY_INPUTS.put(freq, inputPairs);
     }
 
-    public static void addEnergyOutputs(int freq, List<IMultiPart> parts) {
+    public static void addEnergyOutputs(int freq, List<MultiblockPartMachine> parts) {
         Set<Pair<ResourceLocation, BlockPos>> outputPairs = ENERGY_OUTPUTS.computeIfAbsent(freq,
                 (f) -> new HashSet<>());
-        for (IMultiPart part : parts) {
-            if (part instanceof MetaMachine machine) {
-                ServerLevel level = (ServerLevel) machine.getLevel();
-                assert level != null;
-                ResourceLocation dimension = level.dimension().location();
-                BlockPos pos = machine.getPos();
-                Pair<ResourceLocation, BlockPos> pair = new Pair<>(dimension, pos);
-                outputPairs.add(pair);
-            }
+        for (MultiblockPartMachine part : parts) {
+            ServerLevel level = (ServerLevel) part.getLevel();
+            assert level != null;
+            ResourceLocation dimension = level.dimension().location();
+            BlockPos pos = part.getBlockPos();
+            Pair<ResourceLocation, BlockPos> pair = new Pair<>(dimension, pos);
+            outputPairs.add(pair);
         }
         ENERGY_OUTPUTS.put(freq, outputPairs);
     }
 
-    public static void removeEnergyOutputs(int freq, List<IMultiPart> parts) {
+    public static void removeEnergyOutputs(int freq, List<MultiblockPartMachine> parts) {
         Set<Pair<ResourceLocation, BlockPos>> outputPairs = ENERGY_OUTPUTS.computeIfAbsent(freq,
                 (f) -> new HashSet<>());
-        for (IMultiPart part : parts) {
-            if (part instanceof MetaMachine machine) {
-                ServerLevel level = (ServerLevel) machine.getLevel();
-                assert level != null;
-                ResourceLocation dimension = level.dimension().location();
-                BlockPos pos = machine.getPos();
-                Pair<ResourceLocation, BlockPos> pair = new Pair<>(dimension, pos);
-                outputPairs.remove(pair);
-            }
+        for (MultiblockPartMachine part : parts) {
+            ServerLevel level = (ServerLevel) part.getLevel();
+            assert level != null;
+            ResourceLocation dimension = level.dimension().location();
+            BlockPos pos = part.getBlockPos();
+            Pair<ResourceLocation, BlockPos> pair = new Pair<>(dimension, pos);
+            outputPairs.remove(pair);
         }
 
         ENERGY_OUTPUTS.put(freq, outputPairs);
@@ -192,24 +181,24 @@ public class WEBHubMachine extends WorkableElectricMultiblockMachine
         return new EnergyContainerList(energyContainerList);
     }
 
-    private List<IMultiPart> localPowerInput;
+    private List<MultiblockPartMachine> localPowerInput;
 
     protected ConditionalSubscriptionHandler converterSubscription;
 
     @Getter
     private int coolantDrain;
 
-    @Persisted
-    @DescSynced
+    @SaveField
+    @SyncToClient
     @Getter
     private int frequency;
 
-    @Persisted
-    @DescSynced
+    @SaveField
+    @SyncToClient
     private int coolantTimer = 0;
 
-    public WEBHubMachine(IMachineBlockEntity holder) {
-        super(holder);
+    public WEBHubMachine(BlockEntityCreationInfo info) {
+        super(info);
         this.localPowerInput = new ArrayList<>();
 
         this.converterSubscription = new ConditionalSubscriptionHandler(this, this::convertEnergyTick,
@@ -230,7 +219,7 @@ public class WEBHubMachine extends WorkableElectricMultiblockMachine
 
         long tier = GTUtil.getFloorTierByVoltage(inputVoltage);
 
-        doExplosion(15f + tier);
+        doExplosion(getLevel(), getBlockPos(), 15f + tier);
     }
 
     public void convertEnergyTick() {
@@ -319,24 +308,19 @@ public class WEBHubMachine extends WorkableElectricMultiblockMachine
     }
 
     @Override
-    public void onStructureFormed() {
-        super.onStructureFormed();
-
+    public void formStructure(@NotNull String substructureName) {
+        super.formStructure(substructureName);
         if (frequency == 0) {
             setWorkingEnabled(false);
         }
 
         // capture all energy containers
-        List<IMultiPart> localPowerInput = new ArrayList<>();
-        Map<Long, IO> ioMap = getMultiblockState().getMatchContext().getOrCreate("ioMap", Long2ObjectMaps::emptyMap);
+        List<MultiblockPartMachine> localPowerInput = new ArrayList<>();
 
-        for (IMultiPart part : getPrioritySortedParts()) {
-            IO io = ioMap.getOrDefault(part.self().getPos().asLong(), IO.BOTH);
-            if (io == IO.NONE) continue;
+        for (MultiblockPartMachine part : getPrioritySortedParts()) {
             for (var handlerList : part.getRecipeHandlers()) {
                 var handlerIO = handlerList.getHandlerIO();
                 // If IO not compatible
-                if (io != IO.BOTH && handlerIO != IO.BOTH && io != handlerIO) continue;
                 var energyContainers = handlerList.getCapability(EURecipeCapability.CAP).stream()
                         .filter(IEnergyContainer.class::isInstance)
                         .map(IEnergyContainer.class::cast)
@@ -351,8 +335,8 @@ public class WEBHubMachine extends WorkableElectricMultiblockMachine
 
         // Invalidate the structure if there is not at least one output or one input
         if (localPowerInput.isEmpty()) {
-            this.onStructureInvalid();
-            getMultiblockState().setError(new PatternError());
+            this.invalidateStructure();
+            getDefaultPatternState().setError(new PatternStringError(Component.literal("No power inputs")));
             return;
         }
 
@@ -368,39 +352,32 @@ public class WEBHubMachine extends WorkableElectricMultiblockMachine
     }
 
     @NotNull
-    private List<IMultiPart> getPrioritySortedParts() {
+    private List<MultiblockPartMachine> getPrioritySortedParts() {
         return getParts().stream().sorted(Comparator.comparing(part -> {
-            if (part instanceof MetaMachine partMachine) {
-                Block partBlock = partMachine.getBlockState().getBlock();
+            Block partBlock = part.getBlockState().getBlock();
 
-                if (PartAbility.OUTPUT_ENERGY.isApplicable(partBlock))
-                    return 1;
+            if (PartAbility.OUTPUT_ENERGY.isApplicable(partBlock))
+                return 1;
 
-                if (PartAbility.SUBSTATION_OUTPUT_ENERGY.isApplicable(partBlock))
-                    return 2;
+            if (PartAbility.SUBSTATION_OUTPUT_ENERGY.isApplicable(partBlock))
+                return 2;
 
-                if (PartAbility.OUTPUT_LASER.isApplicable(partBlock))
-                    return 3;
-            }
+            if (PartAbility.OUTPUT_LASER.isApplicable(partBlock))
+                return 3;
 
             return 4;
         })).toList();
     }
 
     @Override
-    public @NotNull ManagedFieldHolder getFieldHolder() {
-        return MANAGED_FIELD_HOLDER;
-    }
-
-    @Override
-    public void onStructureInvalid() {
+    public void invalidateStructure() {
         coolantTimer = 0;
         removeWirelessEnergy();
         if ((isWorkingEnabled() && recipeLogic.getStatus() == RecipeLogic.Status.WORKING) &&
                 !ConfigHolder.INSTANCE.machines.harmlessActiveTransformers) {
             explode();
         }
-        super.onStructureInvalid();
+        super.invalidateStructure();
         this.localPowerInput = new ArrayList<>();
         setWorkingEnabled(false);
         converterSubscription.unsubscribe();
@@ -414,7 +391,7 @@ public class WEBHubMachine extends WorkableElectricMultiblockMachine
         addEnergyInputs(frequency, localPowerInput);
     }
 
-    public static TraceabilityPredicate getHatchPredicates() {
+    public static PatternPredicate getHatchPredicates() {
         var predicate = abilities(PartAbility.INPUT_ENERGY).setPreviewCount(1)
                 .or(abilities(PartAbility.SUBSTATION_INPUT_ENERGY).setPreviewCount(1))
                 .or(abilities(PartAbility.INPUT_LASER).setPreviewCount(1));
@@ -422,51 +399,6 @@ public class WEBHubMachine extends WorkableElectricMultiblockMachine
             predicate = predicate.or(abilities(PartAbility.IMPORT_FLUIDS).setExactLimit(1));
         }
         return predicate;
-    }
-
-    @Override
-    public void addDisplayText(@NotNull List<Component> textList) {
-        if (isFormed()) {
-            if (frequency == 0) {
-                textList.add(Component.translatable("gtmutils.web_machines.invalid_frequency")
-                        .withStyle(ChatFormatting.RED));
-                return;
-            }
-            if (!isWorkingEnabled()) {
-                textList.add(Component.translatable("gtceu.multiblock.work_paused"));
-            } else if (isActive()) {
-                long inputAmperage = 0;
-                long inputVoltage = 0;
-
-                if (!localPowerInput.isEmpty()) {
-                    EnergyContainerList localInputs = EnergyUtils.getEnergyListFromMultiParts(localPowerInput);
-                    inputAmperage = localInputs.getInputAmperage();
-                    inputVoltage = localInputs.getInputVoltage();
-                }
-
-                long inputTotal = inputVoltage * inputAmperage;
-
-                textList.add(Component.translatable("gtceu.multiblock.running"));
-                if (inputTotal > 0) {
-                    textList.add(Component
-                            .translatable("gtceu.multiblock.active_transformer.max_input",
-                                    FormattingUtil.formatNumbers(
-                                            Math.abs(inputTotal))));
-                }
-                if (UtilConfig.coolantEnabled()) {
-                    textList.add(Component
-                            .translatable("gtmutils.multiblock.web_hub_machine.coolant_usage",
-                                    FormattingUtil.formatNumbers(coolantDrain),
-                                    UtilMaterials.QuantumCoolant.getLocalizedName()));
-                }
-                if (!ConfigHolder.INSTANCE.machines.harmlessActiveTransformers) {
-                    textList.add(Component
-                            .translatable("gtceu.multiblock.active_transformer.danger_enabled"));
-                }
-            } else {
-                textList.add(Component.translatable("gtceu.multiblock.idling"));
-            }
-        }
     }
 
     public void setFrequencyFromString(String str) {
@@ -504,44 +436,101 @@ public class WEBHubMachine extends WorkableElectricMultiblockMachine
     }
 
     @Override
-    public void attachConfigurators(@NotNull ConfiguratorPanel configuratorPanel) {
-        super.attachConfigurators(configuratorPanel);
-        configuratorPanel.attachConfigurators(new IFancyConfigurator() {
+    public List<IWidget> getWidgetsForDisplay(PanelSyncManager syncManager) {
+        // TODO: Add more widgets here like e.g. the unformed widget? I'm just
+        // copying it 1:1 and not looking at super rn
+        List<IWidget> widgets = new ArrayList<>();
 
-            @Override
-            public Component getTitle() {
-                return Component.translatable("gtmutils.gui.web_hub.wireless_configurator.title");
-            }
+        BooleanSyncValue isFormed = syncManager.getOrCreateSyncHandler("isFormed", BooleanSyncValue.class,
+                () -> new BooleanSyncValue(this::isFormed));
+        IntSyncValue frequency = syncManager.getOrCreateSyncHandler("frequency", IntSyncValue.class,
+                () -> new IntSyncValue(this::getFrequency));
+        BooleanSyncValue isWorkingEnabled = syncManager.getOrCreateSyncHandler("isWorkingEnabled",
+                BooleanSyncValue.class,
+                () -> new BooleanSyncValue(() -> this.getRecipeLogic().isWorkingEnabled()));
+        BooleanSyncValue isActive = syncManager.getOrCreateSyncHandler("isActive",
+                BooleanSyncValue.class,
+                () -> new BooleanSyncValue(() -> this.getRecipeLogic().isActive()));
+        LongSyncValue coolantDrain = syncManager.getOrCreateSyncHandler("coolantDrain",
+                LongSyncValue.class,
+                () -> new LongSyncValue(this::getCoolantDrain));
+        LongSyncValue inputTotal = syncManager.getOrCreateSyncHandler("inputTotal",
+                LongSyncValue.class,
+                () -> new LongSyncValue(() -> {
+                    long inputAmperage = 0;
+                    long inputVoltage = 0;
 
-            @Override
-            public IGuiTexture getIcon() {
-                return new ItemStackTexture(GTItems.SENSOR_UV.asItem());
-            }
+                    if (!localPowerInput.isEmpty()) {
+                        EnergyContainerList localInputs = EnergyUtils.getEnergyListFromMultiParts(localPowerInput);
+                        inputAmperage = localInputs.getInputAmperage();
+                        inputVoltage = localInputs.getInputVoltage();
+                    }
+                    return inputVoltage * inputAmperage;
+                }));
 
-            @Override
-            public Widget createConfigurator() {
-                return new WidgetGroup(0, 0, 130, 25)
-                        .addWidget(new TextFieldWidget().setNumbersOnly(0, Integer.MAX_VALUE)
-                                .setTextResponder(WEBHubMachine.this::setFrequencyFromString)
-                                .setTextSupplier(WEBHubMachine.this::getFrequencyString));
-            }
-        });
+        widgets.add(Text.of(
+                Component.translatable("gtmutils.web_machines.invalid_frequency")
+                        .withStyle(ChatFormatting.RED))
+                .asWidget()
+                .setEnabledIf(w -> isFormed.getBoolValue() && frequency.getIntValue() == 0));
+        widgets.add(Text.of(Component.translatable("gtceu.multiblock.work_paused"))
+                .asWidget()
+                .setEnabledIf(w -> isFormed.getBoolValue() && frequency.getIntValue() != 0 &&
+                        !isWorkingEnabled.getBoolValue()));
+        widgets.add(Text.of(Component.translatable("gtceu.multiblock.idling"))
+                .asWidget()
+                .setEnabledIf(w -> isFormed.getBoolValue() && frequency.getIntValue() != 0 &&
+                        isWorkingEnabled.getBoolValue() && !isActive.getBoolValue()));
+
+        // Adding this so I don't have to copy paste it 10x
+        Supplier<Boolean> everythingUntilNow = () -> isFormed.getBoolValue() && isWorkingEnabled.getBoolValue() &&
+                frequency.getIntValue() != 0 && isActive.getBoolValue();
+
+        widgets.add(Text.of(Component.translatable("gtceu.multiblock.running"))
+                .asWidget().setEnabledIf(w -> everythingUntilNow.get()));
+
+        widgets.add(Text.dynamic(() -> Component
+                .translatable("gtceu.multiblock.active_transformer.max_input",
+                        FormattingUtil.formatNumbers(
+                                Math.abs(inputTotal.getLongValue()))))
+                .asWidget().setEnabledIf(w -> everythingUntilNow.get() && inputTotal.getLongValue() > 0));
+        // I should probably make the config values boolean sync handlers so they sync from server,
+        // but I cba so now they use the client sided config vals lol
+        widgets.add(Text.dynamic(() -> Component
+                .translatable("gtmutils.multiblock.web_hub_machine.coolant_usage",
+                        FormattingUtil.formatNumbers(coolantDrain.getLongValue()),
+                        UtilMaterials.QuantumCoolant.getLocalizedName()))
+                .asWidget()
+                .setEnabledIf(w -> everythingUntilNow.get() && UtilConfig.coolantEnabled()));
+        widgets.add(Text.of(Component.translatable("gtceu.multiblock.active_transformer.danger_enabled"))
+                .asWidget().setEnabledIf(
+                        w -> everythingUntilNow.get() && !ConfigHolder.INSTANCE.machines.harmlessActiveTransformers));
+        return widgets;
     }
 
     @Override
-    public @NotNull Widget createUIWidget() {
-        var group = new WidgetGroup(0, 0, 182 + 8, 117 + 8);
-        group.addWidget(new DraggableScrollableWidgetGroup(4, 4, 182, 117).setBackground(getScreenTexture())
-                .addWidget(new LabelWidget(4, 5, self().getBlockState().getBlock().getDescriptionId()))
-                .addWidget(new ComponentPanelWidget(4, 17, this::addDisplayText)
-                        .setMaxWidthLimit(150)
-                        .clickHandler(this::handleDisplayClick)));
-        group.setBackground(GuiTextures.BACKGROUND_INVERSE);
-        return group;
-    }
+    public MachineUIPanelBuilder getPanelBuilder(PosGuiData data, PanelSyncManager syncManager, UISettings settings) {
+        var builder = MachineUIPanelBuilder.panelBuilder(self());
+        // Partially taken from the popup panels for pattern buffers
+        IPanelHandler wirelessFrequencyPanelHandler = syncManager.syncedPanel("wireless_frequency", true,
+                (syncManager1, panelHandler) -> PopupPanel.createPopupPanel("wireless_frequency", 85, 86)
+                        .child(Text.lang("gtmutils.gui.web_hub.wireless_configurator.title").asWidget().margin(4))
+                        .child(new TextFieldWidget()
+                                .value(new StringSyncValue(this::getFrequencyString, this::setFrequencyFromString)
+                                        .allowC2S())
+                                .top(26)
+                                .leftRel(0.5f)));
 
-    @Override
-    public @NotNull ModularUI createUI(@NotNull Player entityPlayer) {
-        return new ModularUI(198, 208, this, entityPlayer).widget(new FancyMachineUIWidget(this, 198, 208));
+        builder.rightConfigurators(f -> f.child(new ButtonWidget<>()
+                .size(18)
+                .onMousePressed((context, b) -> {
+                    if (b == InputConstants.MOUSE_BUTTON_LEFT) {
+                        wirelessFrequencyPanelHandler.openPanel();
+                        return true;
+                    }
+                    return false;
+                })
+                .overlay(new ItemDrawable(GTItems.SENSOR_UV.asItem()))));
+        return builder;
     }
 }
