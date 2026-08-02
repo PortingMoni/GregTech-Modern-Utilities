@@ -59,10 +59,10 @@ public class WEBInformationProvider implements IBlockComponentProvider, IServerD
             }
             data.put("pterbData", pterbData);
         } else if (blockAccessor.getBlockEntity() instanceof WEBReceiverMachine erap) {
-                    CompoundTag pterbData = new CompoundTag();
-                    pterbData.putInt("currentFrequency", erap.getFrequency());
-                    data.put("pterbData", pterbData);
-                }
+            CompoundTag pterbData = new CompoundTag();
+            pterbData.putInt("currentFrequency", erap.getFrequency());
+            data.put("pterbData", pterbData);
+        }
         compoundTag.put(getUid().toString(), data);
     }
 
