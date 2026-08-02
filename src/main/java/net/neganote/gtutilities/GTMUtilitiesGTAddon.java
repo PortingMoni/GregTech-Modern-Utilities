@@ -28,11 +28,6 @@ public class GTMUtilitiesGTAddon implements IGTAddon {
     }
 
     @Override
-    public void registerTagPrefixes() {
-        // CustomTagPrefixes.init();
-    }
-
-    @Override
     public void addRecipes(Consumer<FinishedRecipe> provider) {
         UtilRecipes.init(provider);
         UtilToolRecipes.init(provider);

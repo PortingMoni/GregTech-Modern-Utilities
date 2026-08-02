@@ -3,7 +3,6 @@ package net.neganote.gtutilities;
 import com.gregtechceu.gtceu.GTCEu;
 import com.gregtechceu.gtceu.api.GTCEuAPI;
 import com.gregtechceu.gtceu.api.data.chemical.material.event.MaterialEvent;
-import com.gregtechceu.gtceu.api.data.chemical.material.event.MaterialRegistryEvent;
 import com.gregtechceu.gtceu.api.data.chemical.material.event.PostMaterialEvent;
 import com.gregtechceu.gtceu.api.machine.MachineDefinition;
 import com.gregtechceu.gtceu.api.recipe.GTRecipeType;
@@ -63,7 +62,6 @@ public class GregTechModernUtilities {
             modEventBus.addListener(UtilKeybinds::register);
             modEventBus.register(UtilShaders.class);
         }
-        modEventBus.addListener(this::addMaterialRegistries);
         modEventBus.addListener(this::addMaterials);
         modEventBus.addListener(this::modifyMaterials);
         modEventBus.addGenericListener(GTRecipeType.class, this::registerRecipeTypes);
@@ -106,7 +104,6 @@ public class GregTechModernUtilities {
         }
         UtilItems.init();
         UtilToolItems.init();
-        REGISTRATE.registerRegistrate();
         UtilDatagen.init();
         UtilPlaceholders.init();
     }
@@ -152,12 +149,6 @@ public class GregTechModernUtilities {
         public static void registerGuiOverlays(RegisterGuiOverlaysEvent event) {
             event.registerAboveAll("spray_can_info", SprayCanHudOverlay.HUD_SPRAY_CAN);
         }
-    }
-
-    // You MUST have this for custom materials.
-    // Remember to register them not to GT's namespace, but your own.
-    private void addMaterialRegistries(MaterialRegistryEvent event) {
-        GTCEuAPI.materialManager.createRegistry(GregTechModernUtilities.MOD_ID);
     }
 
     // As well as this.

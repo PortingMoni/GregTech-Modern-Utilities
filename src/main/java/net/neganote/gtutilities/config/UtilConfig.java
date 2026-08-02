@@ -19,7 +19,7 @@ public class UtilConfig {
     public static ConfigHolder<UtilConfig> CONFIG_HOLDER;
 
     public static void init() {
-        CONFIG_HOLDER = Configuration.registerConfig(UtilConfig.class, ConfigFormats.yaml());
+        CONFIG_HOLDER = Configuration.registerConfig(UtilConfig.class, ConfigFormats.YAML);
         INSTANCE = CONFIG_HOLDER.getConfigInstance();
     }
 
