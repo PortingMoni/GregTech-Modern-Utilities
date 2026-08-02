@@ -1,45 +1,21 @@
 package net.neganote.gtutilities.integration.ae2.machine;
 
-import com.gregtechceu.gtceu.api.gui.GuiTextures;
-import com.gregtechceu.gtceu.api.gui.fancy.ConfiguratorPanel;
-import com.gregtechceu.gtceu.api.gui.fancy.IFancyConfiguratorButton;
-import com.gregtechceu.gtceu.api.gui.widget.ToggleButtonWidget;
-import com.gregtechceu.gtceu.api.machine.IMachineBlockEntity;
-import com.gregtechceu.gtceu.api.machine.MetaMachine;
-import com.gregtechceu.gtceu.api.machine.fancyconfigurator.AutoStockingFancyConfigurator;
-import com.gregtechceu.gtceu.api.machine.fancyconfigurator.CircuitFancyConfigurator;
-import com.gregtechceu.gtceu.api.machine.trait.NotifiableItemStackHandler;
+import com.gregtechceu.gtceu.api.blockentity.BlockEntityCreationInfo;
+import com.gregtechceu.gtceu.api.machine.mui.MachineUIPanelBuilder;
+import com.gregtechceu.gtceu.api.sync_system.annotations.SaveField;
+import com.gregtechceu.gtceu.common.data.GTItems;
+import com.gregtechceu.gtceu.common.mui.widgets.PopupPanel;
 import com.gregtechceu.gtceu.config.ConfigHolder;
-import com.gregtechceu.gtceu.integration.ae2.gui.widget.AEItemConfigWidget;
+import com.gregtechceu.gtceu.integration.ae2.gui.AEConfigWidget;
 import com.gregtechceu.gtceu.integration.ae2.machine.MEStockingBusPartMachine;
-import com.gregtechceu.gtceu.integration.ae2.slot.ExportOnlyAEItemList;
 import com.gregtechceu.gtceu.integration.ae2.slot.ExportOnlyAEItemSlot;
-import com.gregtechceu.gtceu.integration.ae2.slot.ExportOnlyAESlot;
+import com.gregtechceu.gtceu.utils.ExtendedUseOnContext;
 
-import com.lowdragmc.lowdraglib.gui.texture.GuiTextureGroup;
-import com.lowdragmc.lowdraglib.gui.texture.TextTexture;
-import com.lowdragmc.lowdraglib.gui.widget.LabelWidget;
-import com.lowdragmc.lowdraglib.gui.widget.Widget;
-import com.lowdragmc.lowdraglib.gui.widget.WidgetGroup;
-import com.lowdragmc.lowdraglib.syncdata.annotation.DescSynced;
-import com.lowdragmc.lowdraglib.syncdata.annotation.Persisted;
-import com.lowdragmc.lowdraglib.syncdata.field.ManagedFieldHolder;
-import com.lowdragmc.lowdraglib.utils.Position;
-import com.lowdragmc.lowdraglib.utils.Size;
-
-import net.minecraft.ChatFormatting;
 import net.minecraft.MethodsReturnNonnullByDefault;
-import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.Style;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.BlockHitResult;
-import net.neganote.gtutilities.common.gui.widgets.MultilineTextField;
-import net.neganote.gtutilities.utils.TagMatcher;
+import net.neganote.gtutilities.utils.TagFilter;
 
 import appeng.api.config.Actionable;
 import appeng.api.networking.IGrid;
@@ -47,12 +23,23 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.storage.MEStorage;
-import it.unimi.dsi.fastutil.objects.Object2ByteOpenHashMap;
+import brachy.modularui.api.IPanelHandler;
+import brachy.modularui.api.drawable.Text;
+import brachy.modularui.api.widget.IWidget;
+import brachy.modularui.drawable.ItemDrawable;
+import brachy.modularui.factory.PosGuiData;
+import brachy.modularui.screen.RichTooltip;
+import brachy.modularui.screen.UISettings;
+import brachy.modularui.value.sync.BooleanSyncValue;
+import brachy.modularui.value.sync.PanelSyncManager;
+import brachy.modularui.value.sync.SyncHandlers;
+import brachy.modularui.widget.ParentWidget;
+import brachy.modularui.widgets.ButtonWidget;
+import brachy.modularui.widgets.layout.Flow;
+import brachy.modularui.widgets.textfield.TextFieldWidget;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.Comparator;
-import java.util.List;
 import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.function.Predicate;
@@ -63,61 +50,35 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @MethodsReturnNonnullByDefault
 public class METagStockingInputBusPartMachine extends MEStockingBusPartMachine {
 
-    protected static final ManagedFieldHolder MANAGED_FIELD_HOLDER = new ManagedFieldHolder(
-            METagStockingInputBusPartMachine.class, MEStockingBusPartMachine.MANAGED_FIELD_HOLDER);
+    protected static final int DECISION_CACHE_LIMIT = 8192;
 
-    @Persisted
-    @DescSynced
+    protected static final int SLOTS_PER_ROW = 8;
+    protected static final int ROW_HEIGHT = 18 * 2 + 2;
+
+    @SaveField
     protected String whitelistExpr = "";
-    @Persisted
-    @DescSynced
+    @SaveField
     protected String blacklistExpr = "";
-    @DescSynced
-    protected String Wltmp = "";
-    @DescSynced
-    protected String Bltmp = "";
 
-    @DescSynced
-    protected boolean whitelistBadSyntax = false;
+    protected final TagFilter tagFilter;
 
-    @DescSynced
-    protected boolean blacklistBadSyntax = false;
+    private Predicate<GenericStack> tagAutoPullTest = $ -> true;
 
-    private Predicate<GenericStack> tagAutoPullTest = ($) -> true;
-
-    private transient String wlLast = null;
-    private transient String blLast = null;
-    private transient TagMatcher.Compiled wlCompiled = TagMatcher.compile("");
-    private transient TagMatcher.Compiled blCompiled = TagMatcher.compile("");
-
-    private final transient Object2ByteOpenHashMap<AEItemKey> decisionCache = new Object2ByteOpenHashMap<>();
-    private static final int DECISION_CACHE_LIMIT = 8192;
-
-    public METagStockingInputBusPartMachine(IMachineBlockEntity holder, Object... args) {
-        super(holder, args);
-        decisionCache.defaultReturnValue((byte) -1);
+    public METagStockingInputBusPartMachine(BlockEntityCreationInfo info) {
+        this(info, DECISION_CACHE_LIMIT);
     }
 
-    @Override
-    public ManagedFieldHolder getFieldHolder() {
-        return MANAGED_FIELD_HOLDER;
-    }
-
-    @Override
-    protected NotifiableItemStackHandler createInventory(Object... args) {
-        this.aeItemHandler = new ExportOnlyAETagStockingItemList(this, CONFIG_SIZE);
-        return this.aeItemHandler;
+    protected METagStockingInputBusPartMachine(BlockEntityCreationInfo info, int decisionCacheLimit) {
+        super(info);
+        this.tagFilter = new TagFilter(decisionCacheLimit);
     }
 
     @Override
     public void onLoad() {
         super.onLoad();
         if (!isRemote()) {
-            if (super.isAutoPull()) {
-                super.setAutoPull(false);
-            }
-
-            invalidateFilterCaches();
+            disableVanillaAutoPull();
+            tagFilter.invalidate();
 
             if (updateMEStatus()) {
                 refreshListFromTags();
@@ -128,16 +89,32 @@ public class METagStockingInputBusPartMachine extends MEStockingBusPartMachine {
     }
 
     @Override
-    public void autoIO() {
-        if (!isRemote() && super.isAutoPull()) {
+    public boolean isAutoPull() {
+        return true;
+    }
+
+    @Override
+    public void setAutoPull(boolean autoPull) {
+        super.setAutoPull(false);
+    }
+
+    protected void disableVanillaAutoPull() {
+        if (super.isAutoPull()) {
             super.setAutoPull(false);
         }
+    }
 
-        if (this.getTicksPerCycle() == 0) {
-            this.setTicksPerCycle(ConfigHolder.INSTANCE.compat.ae2.updateIntervals);
+    @Override
+    public void autoIO() {
+        if (!isRemote()) {
+            disableVanillaAutoPull();
         }
 
-        if (this.getOffsetTimer() % (long) this.getTicksPerCycle() == 0L) {
+        if (getTicksPerCycle() == 0) {
+            setTicksPerCycle(ConfigHolder.INSTANCE.compat.ae2.updateIntervals);
+        }
+
+        if (getOffsetTimer() % (long) getTicksPerCycle() == 0L) {
             if (!isRemote() && updateMEStatus()) {
                 refreshListFromTags();
                 super.syncME();
@@ -146,78 +123,22 @@ public class METagStockingInputBusPartMachine extends MEStockingBusPartMachine {
         }
     }
 
-    private static String norm(@Nullable String s) {
-        if (s == null) return "";
-        s = s.trim();
-        return s;
-    }
-
-    private void invalidateFilterCaches() {
-        wlLast = null;
-        blLast = null;
-        decisionCache.clear();
-    }
-
-    private void ensureCompiledUpToDate() {
-        String wl = norm(whitelistExpr);
-        String bl = norm(blacklistExpr);
-
-        if (!Objects.equals(wl, wlLast)) {
-            wlLast = wl;
-            wlCompiled = TagMatcher.compile(wl);
-            whitelistBadSyntax = !wlCompiled.isValid();
-            decisionCache.clear();
-        }
-        if (!Objects.equals(bl, blLast)) {
-            blLast = bl;
-            blCompiled = TagMatcher.compile(bl);
-            blacklistBadSyntax = !blCompiled.isValid();
-            decisionCache.clear();
-        }
-
-        if (decisionCache.size() > DECISION_CACHE_LIMIT) {
-            decisionCache.clear();
-        }
-    }
-
     protected boolean isAllowed(AEItemKey key) {
-        ensureCompiledUpToDate();
-        if (whitelistBadSyntax || blacklistBadSyntax) return false;
-
-        if ((wlLast == null || wlLast.isEmpty()) && (blLast == null || blLast.isEmpty())) return false;
-
-        byte cached = decisionCache.getByte(key);
-        if (cached != -1) {
-            return cached == 1;
-        }
-
-        boolean allowed;
-        if (blLast != null && !blLast.isEmpty() && blCompiled != null && blCompiled.isValid()) {
-            if (TagMatcher.doesItemMatch(key, blCompiled)) {
-                decisionCache.put(key, (byte) 0);
-                return false;
-            }
-        }
-
-        if (wlLast != null && !wlLast.isEmpty() && wlCompiled != null && wlCompiled.isValid()) {
-            allowed = TagMatcher.doesItemMatch(key, wlCompiled);
-        } else {
-            allowed = false;
-        }
-
-        decisionCache.put(key, allowed ? (byte) 1 : (byte) 0);
-        return allowed;
+        tagFilter.update(whitelistExpr, blacklistExpr);
+        return tagFilter.isAllowed(key);
     }
 
     protected void refreshListFromTags() {
-        IGrid grid = this.getMainNode().getGrid();
+        IGrid grid = getMainNode().getGrid();
         if (grid == null) {
-            this.aeItemHandler.clearInventory(0);
+            aeItemHandler.clearInventory(0);
             return;
         }
 
         MEStorage networkStorage = grid.getStorageService().getInventory();
         var counter = networkStorage.getAvailableStacks();
+
+        final int size = aeItemHandler.getSlots();
 
         PriorityQueue<Object2LongMap.Entry<AEKey>> top = new PriorityQueue<>(
                 Comparator.comparingLong(Object2LongMap.Entry::getLongValue));
@@ -228,15 +149,14 @@ public class METagStockingInputBusPartMachine extends MEStockingBusPartMachine {
 
             if (amount <= 0) continue;
             if (!(what instanceof AEItemKey itemKey)) continue;
-
             if (!isAllowed(itemKey)) continue;
 
-            long request = networkStorage.extract(what, amount, Actionable.SIMULATE, this.actionSource);
+            long request = networkStorage.extract(what, amount, Actionable.SIMULATE, actionSource);
             if (request == 0L) continue;
 
             if (tagAutoPullTest != null && !tagAutoPullTest.test(new GenericStack(itemKey, amount))) continue;
 
-            if (top.size() < CONFIG_SIZE) {
+            if (top.size() < size) {
                 top.offer(entry);
             } else if (amount > Objects.requireNonNull(top.peek()).getLongValue()) {
                 top.poll();
@@ -247,94 +167,54 @@ public class METagStockingInputBusPartMachine extends MEStockingBusPartMachine {
         int itemAmount = top.size();
 
         int index;
-        for (index = 0; index < CONFIG_SIZE && !top.isEmpty(); index++) {
+        for (index = 0; index < size && !top.isEmpty(); index++) {
             Object2LongMap.Entry<AEKey> entry = top.poll();
             AEKey what = entry.getKey();
             long amount = entry.getLongValue();
-            long request = networkStorage.extract(what, amount, Actionable.SIMULATE, this.actionSource);
+            long request = networkStorage.extract(what, amount, Actionable.SIMULATE, actionSource);
 
-            ExportOnlyAEItemSlot slot = this.aeItemHandler.getInventory()[itemAmount - index - 1];
+            ExportOnlyAEItemSlot slot = aeItemHandler.getInventory()[itemAmount - index - 1];
             slot.setConfig(new GenericStack(what, 1L));
             slot.setStock(new GenericStack(what, request));
         }
-        this.aeItemHandler.clearInventory(index);
-        markDirty();
-        self().getHolder().self().setChanged();
+        aeItemHandler.clearInventory(index);
     }
 
-    @Override
-    public Widget createUIWidget() {
-        WidgetGroup group = new WidgetGroup(new Position(0, 0), new Size(176, 150));
-
-        int y = 6;
-        group.addWidget(new LabelWidget(3, y, () -> this.isOnline ?
-                "gtceu.gui.me_network.online" :
-                "gtceu.gui.me_network.offline"));
-
-        group.addWidget(new ToggleButtonWidget(176 - 55, 2, 50, 16, () -> false, pressed -> {
-            whitelistExpr = pressed ? Wltmp : whitelistExpr;
-            blacklistExpr = pressed ? Bltmp : blacklistExpr;
-
-            invalidateFilterCaches();
-
-            if (updateMEStatus()) {
-                refreshListFromTags();
-                super.syncME();
-                updateInventorySubscription();
-            }
-        }).setTexture(new GuiTextureGroup(GuiTextures.VANILLA_BUTTON, new TextTexture("Confirm")),
-                new GuiTextureGroup(GuiTextures.VANILLA_BUTTON, new TextTexture("Confirm"))));
-
-        y += 14;
-        var WLField = new MultilineTextField(
-                7, y, 160, 25,
-                () -> Wltmp,
-                v -> {
-                    Wltmp = v;
-                },
-                Component.literal("Whitelist tags..."),
-                () -> whitelistBadSyntax ? 0xFFFF0000 : null);
-        group.addWidget(WLField);
-
-        y += 29;
-        var BLField = new MultilineTextField(
-                7, y, 160, 25,
-                () -> Bltmp,
-                v -> {
-                    Bltmp = v;
-                },
-                Component.literal("Blacklist tags..."),
-                () -> blacklistBadSyntax ? 0xFFFF0000 : null);
-        group.addWidget(BLField);
-
-        WLField.setDirectly(whitelistExpr);
-        BLField.setDirectly(blacklistExpr);
-
-        y += 29;
-
-        group.addWidget(new AEItemConfigWidget(15, y, this.aeItemHandler) {
-
-            @Override
-            public boolean isStocking() {
-                return true;
-            }
-
-            @Override
-            public boolean isAutoPull() {
-                return true;
-            }
-        });
-
-        return group;
+    protected void setWhitelistExpr(String expr) {
+        this.whitelistExpr = expr;
+        onFilterChanged();
     }
 
-    @Override
-    protected InteractionResult onScrewdriverClick(Player playerIn, InteractionHand hand, Direction gridSide,
-                                                   BlockHitResult hitResult) {
-        if (!this.isRemote()) {
-            playerIn.sendSystemMessage(Component.literal("This bus is always Tag-Mode (no manual/autoPull toggle)."));
+    protected void setBlacklistExpr(String expr) {
+        this.blacklistExpr = expr;
+        onFilterChanged();
+    }
+
+    protected void onFilterChanged() {
+        if (isRemote()) return;
+
+        tagFilter.invalidate();
+
+        if (updateMEStatus()) {
+            refreshListFromTags();
+            super.syncME();
+            updateInventorySubscription();
         }
-        return InteractionResult.sidedSuccess(this.isRemote());
+    }
+
+    @Override
+    public void setAutoPullTest(Predicate<GenericStack> autoPullTest) {
+        this.tagAutoPullTest = autoPullTest;
+        super.setAutoPullTest(autoPullTest);
+    }
+
+    @Override
+    protected InteractionResult onScrewdriverClick(ExtendedUseOnContext context) {
+        if (!isRemote()) {
+            context.getPlayer().sendSystemMessage(
+                    Component.literal("This bus is always Tag-Mode (no manual/autoPull toggle)."));
+        }
+        return InteractionResult.sidedSuccess(isRemote());
     }
 
     @Override
@@ -349,125 +229,95 @@ public class METagStockingInputBusPartMachine extends MEStockingBusPartMachine {
     @Override
     protected void readConfigFromTag(CompoundTag tag) {
         super.readConfigFromTag(tag);
-        if (!isRemote() && super.isAutoPull()) {
-            super.setAutoPull(false);
+        if (!isRemote()) {
+            disableVanillaAutoPull();
         }
 
         if (tag.contains("WhitelistExpr")) whitelistExpr = tag.getString("WhitelistExpr");
         if (tag.contains("BlacklistExpr")) blacklistExpr = tag.getString("BlacklistExpr");
 
-        invalidateFilterCaches();
+        onFilterChanged();
+    }
 
-        if (!isRemote() && updateMEStatus()) {
-            refreshListFromTags();
-            super.syncME();
-            updateInventorySubscription();
-        }
+    ///////////////////////////////
+    // ********** GUI ***********//
+    ///////////////////////////////
+
+    @Override
+    public MachineUIPanelBuilder getPanelBuilder(PosGuiData data, PanelSyncManager syncManager, UISettings settings) {
+        IPanelHandler settingsPanelHandler = syncManager.syncedPanel("stocking_settings", true,
+                (sm, sh) -> PopupPanel.createPopupPanel("stocking_settings_panel", 140, 70)
+                        .child(Flow.col()
+                                .coverChildren()
+                                .child(Text.lang("gtceu.gui.me_network.min_stack_size").asWidget())
+                                .child(new TextFieldWidget()
+                                        .size(120, 18)
+                                        .value(SyncHandlers.intNumber(this::getMinStackSize, this::setMinStackSize)
+                                                .allowC2S())
+                                        .setNumbers(1, Integer.MAX_VALUE))
+                                .child(Text.lang("gtceu.gui.me_network.ticks_per_cycle").asWidget())
+                                .child(new TextFieldWidget()
+                                        .size(120, 18)
+                                        .value(SyncHandlers.intNumber(this::getTicksPerCycle, this::setTicksPerCycle)
+                                                .allowC2S())
+                                        .setNumbers(1, 200))
+                                .margin(5)));
+
+        return MachineUIPanelBuilder.panelBuilder(this)
+                .rightConfigurators(f -> f.child(new ButtonWidget<>()
+                        .size(18)
+                        .onMousePressed((context, b) -> {
+                            settingsPanelHandler.openPanel();
+                            return true;
+                        })
+                        .overlay(new ItemDrawable(GTItems.TOOL_DATA_STICK.asItem()).asIcon().size(16))
+                        .tooltip(new RichTooltip()
+                                .addLine(Text.lang("gtceu.gui.me_network.stocking_settings")))));
     }
 
     @Override
-    public void setAutoPullTest(Predicate<GenericStack> autoPullTest) {
-        this.tagAutoPullTest = autoPullTest;
-        super.setAutoPullTest(autoPullTest);
+    public void buildMainUI(ParentWidget<?> mainWidget, PosGuiData guiData, PanelSyncManager syncManager,
+                            UISettings settings) {
+        BooleanSyncValue isOnlineValue = new BooleanSyncValue(this::isOnline, this::setOnline);
+        syncManager.syncValue("is_online", isOnlineValue);
+
+        registerConfigActions(syncManager);
+
+        var flow = Flow.col().coverChildren();
+
+        flow.child(Text.dynamic(() -> isOnlineValue.getBoolValue() ?
+                Component.translatable("gtceu.gui.me_network.online") :
+                Component.translatable("gtceu.gui.me_network.offline"))
+                .asWidget().marginTop(2).marginBottom(4));
+
+        flow.child(createFilterFields(syncManager));
+        flow.child(createConfigDisplay(syncManager));
+
+        mainWidget.child(flow.center());
     }
 
-    // We can't call super to avoid the auto-pull toggle...
-    @Override
-    public void attachConfigurators(ConfiguratorPanel configuratorPanel) {
-        configuratorPanel.attachConfigurators(new IFancyConfiguratorButton.Toggle(
-                GuiTextures.BUTTON_POWER.getSubTexture(0, 0, 1, 0.5),
-                GuiTextures.BUTTON_POWER.getSubTexture(0, 0.5, 1, 0.5),
-                this::isWorkingEnabled, (clickData, pressed) -> this.setWorkingEnabled(pressed))
-                .setTooltipsSupplier(pressed -> List.of(
-                        Component.translatable(
-                                pressed ? "behaviour.soft_hammer.enabled" : "behaviour.soft_hammer.disabled"))));
-        for (var direction : Direction.values()) {
-            if (this.getCoverContainer().hasCover(direction)) {
-                var configurator = this.getCoverContainer().getCoverAtSide(direction).getConfigurator();
-                if (configurator != null)
-                    configuratorPanel.attachConfigurators(configurator);
-            }
-        }
-        configuratorPanel.attachConfigurators(new IFancyConfiguratorButton.Toggle(
-                GuiTextures.BUTTON_DISTINCT_BUSES.getSubTexture(0, 0.5, 1, 0.5),
-                GuiTextures.BUTTON_DISTINCT_BUSES.getSubTexture(0, 0, 1, 0.5),
-                this::isDistinct, (clickData, pressed) -> setDistinct(pressed))
-                .setTooltipsSupplier(pressed -> List.of(
-                        Component.translatable("gtceu.multiblock.universal.distinct")
-                                .setStyle(Style.EMPTY.withColor(ChatFormatting.YELLOW))
-                                .append(Component.translatable(pressed ? "gtceu.multiblock.universal.distinct.yes" :
-                                        "gtceu.multiblock.universal.distinct.no")))));
-        configuratorPanel.attachConfigurators(new CircuitFancyConfigurator(circuitInventory.storage));
-        configuratorPanel.attachConfigurators(new AutoStockingFancyConfigurator(this));
+    protected Flow createFilterFields(PanelSyncManager syncManager) {
+        return Flow.col()
+                .coverChildrenHeight()
+                .width(SLOTS_PER_ROW * 18)
+                .child(new TextFieldWidget()
+                        .size(SLOTS_PER_ROW * 18, 18)
+                        .marginBottom(2)
+                        .hintText(Component.literal("Whitelist tags..."))
+                        .setMaxLength(Short.MAX_VALUE)
+                        .value(SyncHandlers.string(() -> whitelistExpr, this::setWhitelistExpr).allowC2S()))
+                .child(new TextFieldWidget()
+                        .size(SLOTS_PER_ROW * 18, 18)
+                        .marginBottom(4)
+                        .hintText(Component.literal("Blacklist tags..."))
+                        .setMaxLength(Short.MAX_VALUE)
+                        .value(SyncHandlers.string(() -> blacklistExpr, this::setBlacklistExpr).allowC2S()));
     }
 
-    private class ExportOnlyAETagStockingItemList extends ExportOnlyAEItemList {
-
-        public ExportOnlyAETagStockingItemList(MetaMachine holder, int slots) {
-            super(holder, slots, () -> METagStockingInputBusPartMachine.this.new ExportOnlyAETagStockingItemSlot());
-        }
-
-        @Override
-        public boolean isAutoPull() {
-            return true;
-        }
-
-        @Override
-        public boolean isStocking() {
-            return true;
-        }
-
-        @Override
-        public boolean hasStackInConfig(GenericStack stack, boolean checkExternal) {
-            boolean inThisBus = super.hasStackInConfig(stack, false);
-            if (inThisBus) return true;
-            return checkExternal && METagStockingInputBusPartMachine.this.testConfiguredInOtherPart(stack);
-        }
-    }
-
-    private class ExportOnlyAETagStockingItemSlot extends ExportOnlyAEItemSlot {
-
-        public ExportOnlyAETagStockingItemSlot() {}
-
-        public ExportOnlyAETagStockingItemSlot(@Nullable GenericStack config, GenericStack stock) {
-            super(config, stock);
-        }
-
-        @Override
-        public ItemStack extractItem(int slot, int amount, boolean simulate) {
-            if (slot == 0 && this.stock != null && this.config != null) {
-                if (!METagStockingInputBusPartMachine.this.isOnline()) return ItemStack.EMPTY;
-
-                IGrid grid = METagStockingInputBusPartMachine.this.getMainNode().getGrid();
-                if (grid == null) return ItemStack.EMPTY;
-
-                MEStorage aeNetwork = grid.getStorageService().getInventory();
-                Actionable action = simulate ? Actionable.SIMULATE : Actionable.MODULATE;
-                AEKey key = this.config.what();
-
-                long extracted = aeNetwork.extract(key, amount, action,
-                        METagStockingInputBusPartMachine.this.actionSource);
-                if (extracted > 0L) {
-                    ItemStack result;
-                    if (key instanceof AEItemKey itemKey) result = itemKey.toStack((int) extracted);
-                    else result = ItemStack.EMPTY;
-
-                    if (!simulate) {
-                        this.stock = ExportOnlyAESlot.copy(this.stock, this.stock.amount() - extracted);
-                        if (this.stock.amount() == 0L) this.stock = null;
-                        if (this.onContentsChanged != null) this.onContentsChanged.run();
-                    }
-                    return result;
-                }
-            }
-            return ItemStack.EMPTY;
-        }
-
-        @Override
-        public ExportOnlyAETagStockingItemSlot copy() {
-            return METagStockingInputBusPartMachine.this.new ExportOnlyAETagStockingItemSlot(
-                    this.config == null ? null : copy(this.config),
-                    this.stock == null ? null : copy(this.stock));
-        }
+    protected IWidget createConfigDisplay(PanelSyncManager syncManager) {
+        int slots = aeItemHandler.getSlots();
+        return new AEConfigWidget(aeItemHandler, slots, false)
+                .syncManager(syncManager)
+                .size(SLOTS_PER_ROW * 18, (slots / SLOTS_PER_ROW) * ROW_HEIGHT);
     }
 }

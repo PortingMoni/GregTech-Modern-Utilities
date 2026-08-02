@@ -2,7 +2,7 @@ package net.neganote.gtutilities.utils;
 
 import com.gregtechceu.gtceu.api.capability.IEnergyContainer;
 import com.gregtechceu.gtceu.api.capability.recipe.EURecipeCapability;
-import com.gregtechceu.gtceu.api.machine.feature.multiblock.IMultiPart;
+import com.gregtechceu.gtceu.api.machine.multiblock.part.MultiblockPartMachine;
 import com.gregtechceu.gtceu.api.misc.EnergyContainerList;
 import com.gregtechceu.gtceu.common.machine.multiblock.part.EnergyHatchPartMachine;
 import com.gregtechceu.gtceu.common.machine.multiblock.part.LaserHatchPartMachine;
@@ -12,9 +12,9 @@ import java.util.List;
 
 public class EnergyUtils {
 
-    public static EnergyContainerList getEnergyListFromMultiParts(List<IMultiPart> parts) {
+    public static EnergyContainerList getEnergyListFromMultiParts(List<MultiblockPartMachine> parts) {
         List<IEnergyContainer> energyContainerList = new ArrayList<>();
-        for (IMultiPart part : parts) {
+        for (MultiblockPartMachine part : parts) {
             if (part instanceof EnergyHatchPartMachine hatch) {
                 energyContainerList.add(hatch.energyContainer);
             }

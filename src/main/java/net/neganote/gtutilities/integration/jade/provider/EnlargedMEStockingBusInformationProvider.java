@@ -1,6 +1,5 @@
 package net.neganote.gtutilities.integration.jade.provider;
 
-import com.gregtechceu.gtceu.api.blockentity.MetaMachineBlockEntity;
 import com.gregtechceu.gtceu.integration.ae2.machine.MEStockingBusPartMachine;
 import com.gregtechceu.gtceu.integration.ae2.slot.IConfigurableSlot;
 
@@ -50,12 +49,9 @@ public class EnlargedMEStockingBusInformationProvider
     @Override
     public void appendServerData(CompoundTag out, BlockAccessor accessor) {
         BlockEntity be = accessor.getBlockEntity();
-        if (!(be instanceof MetaMachineBlockEntity mmbe)) return;
+        if (!isTargetMachine(be)) return;
 
-        Object mm = mmbe.getMetaMachine();
-        if (!isTargetMachine(mm)) return;
-
-        MEStockingBusPartMachine bus = (MEStockingBusPartMachine) mm;
+        MEStockingBusPartMachine bus = (MEStockingBusPartMachine) be;
         var slotList = bus.getSlotList();
         int total = slotList.getConfigurableSlots();
 
@@ -91,10 +87,7 @@ public class EnlargedMEStockingBusInformationProvider
     @Override
     public void appendTooltip(ITooltip tooltip, BlockAccessor accessor, IPluginConfig config) {
         BlockEntity be = accessor.getBlockEntity();
-        if (!(be instanceof MetaMachineBlockEntity mmbe)) return;
-
-        Object mm = mmbe.getMetaMachine();
-        if (!isTargetMachine(mm)) return;
+        if (!isTargetMachine(be)) return;
 
         CompoundTag root = accessor.getServerData().getCompound(getUid().toString());
         if (root == null) return;
