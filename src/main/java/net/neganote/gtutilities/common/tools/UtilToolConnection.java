@@ -1,11 +1,11 @@
 package net.neganote.gtutilities.common.tools;
 
 import com.gregtechceu.gtceu.GTCEu;
-import com.gregtechceu.gtceu.api.GTCEuAPI;
 import com.gregtechceu.gtceu.api.data.chemical.material.Material;
 import com.gregtechceu.gtceu.api.data.chemical.material.properties.PropertyKey;
 import com.gregtechceu.gtceu.api.data.chemical.material.properties.ToolProperty;
 import com.gregtechceu.gtceu.api.item.tool.GTToolType;
+import com.gregtechceu.gtceu.api.registry.GTRegistries;
 
 import net.neganote.gtutilities.config.UtilConfig;
 
@@ -15,7 +15,7 @@ import net.neganote.gtutilities.config.UtilConfig;
 public class UtilToolConnection {
 
     public static void modifyMaterials() {
-        for (Material material : GTCEuAPI.materialManager.getRegisteredMaterials()) {
+        for (Material material : GTRegistries.MATERIALS.values()) {
             ToolProperty toolProperty = material.getProperty(PropertyKey.TOOL);
 
             if (toolProperty == null) {
