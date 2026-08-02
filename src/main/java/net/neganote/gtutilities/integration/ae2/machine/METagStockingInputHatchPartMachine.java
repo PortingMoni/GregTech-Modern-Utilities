@@ -10,17 +10,14 @@ import com.gregtechceu.gtceu.config.ConfigHolder;
 import com.gregtechceu.gtceu.integration.ae2.gui.AEConfigWidget;
 import com.gregtechceu.gtceu.integration.ae2.machine.MEHatchPartMachine;
 import com.gregtechceu.gtceu.integration.ae2.machine.MEStockingHatchPartMachine;
-import com.gregtechceu.gtceu.integration.ae2.slot.ExportOnlyAEFluidList;
 import com.gregtechceu.gtceu.integration.ae2.slot.ExportOnlyAEFluidSlot;
-import com.gregtechceu.gtceu.integration.ae2.slot.ExportOnlyAESlot;
-import com.gregtechceu.gtceu.integration.ae2.utils.AEUtil;
 import com.gregtechceu.gtceu.utils.ExtendedUseOnContext;
 
 import net.minecraft.MethodsReturnNonnullByDefault;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionResult;
-import net.minecraftforge.fluids.FluidStack;
+import net.neganote.gtutilities.integration.ae2.StockingFluidList;
 import net.neganote.gtutilities.utils.TagFilter;
 
 import appeng.api.config.Actionable;
@@ -44,7 +41,6 @@ import brachy.modularui.widgets.ButtonWidget;
 import brachy.modularui.widgets.layout.Flow;
 import brachy.modularui.widgets.textfield.TextFieldWidget;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.Comparator;
 import java.util.Objects;
@@ -82,7 +78,8 @@ public class METagStockingInputHatchPartMachine extends MEStockingHatchPartMachi
 
     @Override
     protected NotifiableFluidTank createTank(int initialCapacity, int slots) {
-        this.aeFluidHandler = new TagStockingFluidList(this, configSlotCount());
+        this.aeFluidHandler = new StockingFluidList(this, configSlotCount(), this::isAutoPull,
+                () -> actionSource);
         return this.aeFluidHandler;
     }
 
@@ -336,83 +333,5 @@ public class METagStockingInputHatchPartMachine extends MEStockingHatchPartMachi
         return new AEConfigWidget(aeFluidHandler, slots, true)
                 .syncManager(syncManager)
                 .size(SLOTS_PER_ROW * 18, (slots / SLOTS_PER_ROW) * ROW_HEIGHT);
-    }
-
-    protected static class TagStockingFluidList extends ExportOnlyAEFluidList {
-
-        private final METagStockingInputHatchPartMachine machine;
-
-        public TagStockingFluidList(METagStockingInputHatchPartMachine machine, int slots) {
-            super(machine, slots, () -> new TagStockingFluidSlot(machine));
-            this.machine = machine;
-        }
-
-        @Override
-        public boolean isAutoPull() {
-            return true;
-        }
-
-        @Override
-        public boolean isStocking() {
-            return true;
-        }
-
-        @Override
-        public boolean hasStackInConfig(GenericStack stack, boolean checkExternal) {
-            boolean inThisHatch = super.hasStackInConfig(stack, false);
-            if (inThisHatch) return true;
-            return checkExternal && machine.testConfiguredInOtherPart(stack);
-        }
-    }
-
-    protected static class TagStockingFluidSlot extends ExportOnlyAEFluidSlot {
-
-        private final METagStockingInputHatchPartMachine machine;
-
-        public TagStockingFluidSlot(METagStockingInputHatchPartMachine machine) {
-            super();
-            this.machine = machine;
-        }
-
-        public TagStockingFluidSlot(METagStockingInputHatchPartMachine machine,
-                                    @Nullable GenericStack config, @Nullable GenericStack stock) {
-            super(config, stock);
-            this.machine = machine;
-        }
-
-        @Override
-        public ExportOnlyAEFluidSlot copy() {
-            return new TagStockingFluidSlot(machine,
-                    this.config == null ? null : copy(this.config),
-                    this.stock == null ? null : copy(this.stock));
-        }
-
-        @Override
-        public FluidStack drain(int maxDrain, FluidAction action) {
-            if (this.stock == null || this.config == null) return FluidStack.EMPTY;
-            if (!machine.isOnline()) return FluidStack.EMPTY;
-
-            IGrid grid = machine.getMainNode().getGrid();
-            if (grid == null) return FluidStack.EMPTY;
-
-            MEStorage aeNetwork = grid.getStorageService().getInventory();
-            Actionable actionable = action.simulate() ? Actionable.SIMULATE : Actionable.MODULATE;
-            var key = config.what();
-            long extracted = aeNetwork.extract(key, maxDrain, actionable, machine.actionSource);
-            if (extracted <= 0) return FluidStack.EMPTY;
-
-            FluidStack resultStack = key instanceof AEFluidKey fluidKey ?
-                    AEUtil.toFluidStack(fluidKey, extracted) : FluidStack.EMPTY;
-            if (action.execute()) {
-                this.stock = ExportOnlyAESlot.copy(stock, stock.amount() - extracted);
-                if (this.stock.amount() == 0) {
-                    this.stock = null;
-                }
-                if (this.onContentsChanged != null) {
-                    this.onContentsChanged.run();
-                }
-            }
-            return resultStack;
-        }
     }
 }
