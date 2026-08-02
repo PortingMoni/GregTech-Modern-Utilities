@@ -5,6 +5,7 @@ import com.gregtechceu.gtceu.api.GTCEuAPI;
 import com.gregtechceu.gtceu.api.data.chemical.material.event.MaterialEvent;
 import com.gregtechceu.gtceu.api.data.chemical.material.event.PostMaterialEvent;
 import com.gregtechceu.gtceu.api.machine.MachineDefinition;
+import com.gregtechceu.gtceu.api.placeholder.Placeholder;
 import com.gregtechceu.gtceu.api.recipe.GTRecipeType;
 import com.gregtechceu.gtceu.api.registry.registrate.GTRegistrate;
 import com.gregtechceu.gtceu.common.data.GTCreativeModeTabs;
@@ -66,6 +67,7 @@ public class GregTechModernUtilities {
         modEventBus.addListener(this::modifyMaterials);
         modEventBus.addGenericListener(GTRecipeType.class, this::registerRecipeTypes);
         modEventBus.addGenericListener(MachineDefinition.class, this::registerMachines);
+        modEventBus.addGenericListener(Placeholder.class, this::registerPlaceholders);
 
         // Most other events are fired on Forge's bus.
         // If we want to use annotations to register event listeners,
@@ -105,7 +107,6 @@ public class GregTechModernUtilities {
         UtilItems.init();
         UtilToolItems.init();
         UtilDatagen.init();
-        UtilPlaceholders.init();
     }
 
     public static ResourceLocation id(String path) {
@@ -149,6 +150,10 @@ public class GregTechModernUtilities {
         public static void registerGuiOverlays(RegisterGuiOverlaysEvent event) {
             event.registerAboveAll("spray_can_info", SprayCanHudOverlay.HUD_SPRAY_CAN);
         }
+    }
+
+    private void registerPlaceholders(GTCEuAPI.RegisterEvent<ResourceLocation, Placeholder> event) {
+        UtilPlaceholders.init();
     }
 
     // As well as this.
