@@ -1,6 +1,5 @@
 package net.neganote.gtutilities.integration.jade.provider;
 
-import com.gregtechceu.gtceu.api.blockentity.MetaMachineBlockEntity;
 import com.gregtechceu.gtceu.utils.FormattingUtil;
 
 import net.minecraft.nbt.CompoundTag;
@@ -24,7 +23,7 @@ public class WEBInformationProvider implements IBlockComponentProvider, IServerD
     @Override
     public void appendTooltip(ITooltip iTooltip, BlockAccessor blockAccessor, IPluginConfig iPluginConfig) {
         BlockEntity be = blockAccessor.getBlockEntity();
-        if (be instanceof MetaMachineBlockEntity mmbe && mmbe.getMetaMachine() instanceof WEBHubMachine pterb) {
+        if (be instanceof WEBHubMachine pterb) {
             CompoundTag data = blockAccessor.getServerData().getCompound(getUid().toString());
             if (data.contains("pterbData")) {
                 var tag = data.getCompound("pterbData");
@@ -38,7 +37,7 @@ public class WEBInformationProvider implements IBlockComponentProvider, IServerD
                 }
             }
         } else
-            if (be instanceof MetaMachineBlockEntity mmbe && mmbe.getMetaMachine() instanceof WEBReceiverMachine) {
+            if (be instanceof WEBReceiverMachine) {
                 CompoundTag data = blockAccessor.getServerData().getCompound(getUid().toString());
                 if (data.contains("pterbData")) {
                     var tag = data.getCompound("pterbData");
@@ -51,8 +50,7 @@ public class WEBInformationProvider implements IBlockComponentProvider, IServerD
     @Override
     public void appendServerData(CompoundTag compoundTag, BlockAccessor blockAccessor) {
         CompoundTag data = compoundTag.getCompound(getUid().toString());
-        if (blockAccessor.getBlockEntity() instanceof MetaMachineBlockEntity mmbe &&
-                mmbe.getMetaMachine() instanceof WEBHubMachine pterb) {
+        if (blockAccessor.getBlockEntity() instanceof WEBHubMachine pterb) {
             CompoundTag pterbData = new CompoundTag();
             pterbData.putInt("currentFrequency", pterb.getFrequency());
             if (UtilConfig.coolantEnabled() && pterb.isFormed()) {
@@ -60,8 +58,7 @@ public class WEBInformationProvider implements IBlockComponentProvider, IServerD
                 pterbData.putInt("coolantDrain", coolantDrain);
             }
             data.put("pterbData", pterbData);
-        } else if (blockAccessor.getBlockEntity() instanceof MetaMachineBlockEntity mmbe &&
-                mmbe.getMetaMachine() instanceof WEBReceiverMachine erap) {
+        } else if (blockAccessor.getBlockEntity() instanceof WEBReceiverMachine erap) {
                     CompoundTag pterbData = new CompoundTag();
                     pterbData.putInt("currentFrequency", erap.getFrequency());
                     data.put("pterbData", pterbData);
