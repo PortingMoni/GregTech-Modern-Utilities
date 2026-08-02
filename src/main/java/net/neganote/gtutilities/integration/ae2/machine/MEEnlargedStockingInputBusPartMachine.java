@@ -5,7 +5,6 @@ import com.gregtechceu.gtceu.api.sync_system.annotations.SaveField;
 import com.gregtechceu.gtceu.config.ConfigHolder;
 import com.gregtechceu.gtceu.integration.ae2.gui.AEConfigWidget;
 import com.gregtechceu.gtceu.integration.ae2.machine.MEStockingBusPartMachine;
-import com.gregtechceu.gtceu.integration.ae2.slot.ExportOnlyAEItemList;
 import com.gregtechceu.gtceu.integration.ae2.slot.ExportOnlyAEItemSlot;
 import com.gregtechceu.gtceu.integration.ae2.slot.ExportOnlyAESlot;
 import com.gregtechceu.gtceu.utils.ExtendedUseOnContext;
@@ -16,6 +15,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
 import net.neganote.gtutilities.config.UtilConfig;
+import net.neganote.gtutilities.integration.ae2.AEStockingSlots;
 
 import appeng.api.config.Actionable;
 import appeng.api.networking.IGrid;
@@ -34,9 +34,6 @@ import brachy.modularui.widget.scroll.VerticalScrollData;
 import brachy.modularui.widgets.layout.Flow;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.PriorityQueue;
 import java.util.function.Predicate;
@@ -61,36 +58,8 @@ public class MEEnlargedStockingInputBusPartMachine extends MEStockingBusPartMach
 
     public MEEnlargedStockingInputBusPartMachine(BlockEntityCreationInfo info) {
         super(info);
-        growConfigSlots();
+        AEStockingSlots.growConfigSlots(this, aeItemHandler, TOTAL_SLOTS);
         super.setAutoPull(false);
-    }
-
-    private void growConfigSlots() {
-        ExportOnlyAEItemSlot[] current = aeItemHandler.getInventory();
-        if (current.length >= TOTAL_SLOTS) return;
-
-        ExportOnlyAEItemSlot[] grown = Arrays.copyOf(current, TOTAL_SLOTS);
-        for (int i = current.length; i < TOTAL_SLOTS; i++) {
-            // The slots are empty at this point, so copying one is just a way to get another slot of the
-            // superclass' private stocking slot type.
-            grown[i] = current[0].copy();
-            grown[i].setOnContentsChanged(aeItemHandler::onContentsChanged);
-        }
-
-        try {
-            Field inventoryField = ExportOnlyAEItemList.class.getDeclaredField("inventory");
-            inventoryField.setAccessible(true);
-            inventoryField.set(aeItemHandler, grown);
-
-            // Stocking slots only extract while they hold a reference back to their bus, and the superclass hands
-            // that out when it builds the list - the slots added above still need it.
-            Method bindSlots = aeItemHandler.getClass()
-                    .getDeclaredMethod("setStockingBusPartMachine", MEStockingBusPartMachine.class);
-            bindSlots.setAccessible(true);
-            bindSlots.invoke(aeItemHandler, this);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("FATAL: Failed to enlarge the stocking bus config slots.", e);
-        }
     }
 
     @Override
@@ -103,7 +72,6 @@ public class MEEnlargedStockingInputBusPartMachine extends MEStockingBusPartMach
         this.enlargedAutoPull = autoPull;
 
         if (!isRemote()) {
-            syncDataHolder.markClientSyncFieldDirty("enlargedAutoPull");
             if (!this.enlargedAutoPull) {
                 this.aeItemHandler.clearInventory(0);
             } else if (updateMEStatus()) {
@@ -150,9 +118,6 @@ public class MEEnlargedStockingInputBusPartMachine extends MEStockingBusPartMach
         }
     }
 
-    /**
-     * The superclass' refresh is private and bounded by {@code CONFIG_SIZE}; this fills every enlarged slot.
-     */
     private void refreshListEnlarged() {
         IGrid grid = this.getMainNode().getGrid();
         if (grid == null) {
@@ -249,6 +214,7 @@ public class MEEnlargedStockingInputBusPartMachine extends MEStockingBusPartMach
                             UISettings settings) {
         BooleanSyncValue isOnlineValue = new BooleanSyncValue(this::isOnline, this::setOnline);
         syncManager.syncValue("is_online", isOnlineValue);
+        syncManager.syncValue("auto_pull", new BooleanSyncValue(this::isAutoPull, this::setAutoPull));
 
         registerConfigActions(syncManager);
 
@@ -262,7 +228,6 @@ public class MEEnlargedStockingInputBusPartMachine extends MEStockingBusPartMach
         int slots = aeItemHandler.getSlots();
         int rows = Math.max(1, slots / SLOTS_PER_ROW);
 
-        // Same config widget the normal stocking bus uses, but too tall to fit, so it scrolls.
         flow.child(new ScrollWidget<>(new VerticalScrollData())
                 .size(SLOTS_PER_ROW * 18 + 8, Math.min(VISIBLE_ROWS, rows) * ROW_HEIGHT)
                 .child(new AEConfigWidget(aeItemHandler, slots, false)
