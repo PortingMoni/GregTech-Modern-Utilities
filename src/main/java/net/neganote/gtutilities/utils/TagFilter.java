@@ -9,12 +9,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
 
-/**
- * Compiled whitelist/blacklist tag expressions plus a decision cache, shared by the tag stocking parts.
- * <p>
- * {@link #update(String, String)} has to be called before {@link #isAllowed(AEKey)} so that edited expressions are
- * recompiled; both expressions live on the machine so that they can be saved and synced.
- */
 public final class TagFilter {
 
     private final Object2ByteOpenHashMap<AEKey> decisionCache = new Object2ByteOpenHashMap<>();
@@ -35,9 +29,6 @@ public final class TagFilter {
         this.decisionCache.defaultReturnValue((byte) -1);
     }
 
-    /**
-     * Drops every cached decision and forces both expressions to be recompiled on the next update.
-     */
     public void invalidate() {
         whitelist = null;
         blacklist = null;
@@ -66,10 +57,6 @@ public final class TagFilter {
         }
     }
 
-    /**
-     * @return whether the key passes the blacklist and is matched by the whitelist. Nothing is allowed while either
-     *         expression fails to compile, or while both are empty.
-     */
     public boolean isAllowed(AEKey key) {
         if (whitelistBadSyntax || blacklistBadSyntax) return false;
         if (isEmpty(whitelist) && isEmpty(blacklist)) return false;
