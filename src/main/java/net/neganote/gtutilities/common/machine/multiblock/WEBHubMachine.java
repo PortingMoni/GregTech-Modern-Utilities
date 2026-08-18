@@ -501,7 +501,7 @@ public class WEBHubMachine extends WorkableElectricMultiblockMachine {
                 return Component
                             .translatable("gtmutils.multiblock.web_hub_machine.coolant_usage",
                                     FormattingUtil.formatNumbers(coolantDrain.getLongValue()),
-                                    UtilMaterials.QuantumCoolant.getLocalizedName())
+                                    UtilMaterials.QuantumCoolant.getLocalizedName());
                 })
                 .asWidget()
                 .setEnabledIf(w -> everythingUntilNow.get() && UtilConfig.coolantEnabled()));
