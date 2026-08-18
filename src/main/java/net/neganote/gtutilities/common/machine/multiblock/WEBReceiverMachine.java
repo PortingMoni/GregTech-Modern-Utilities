@@ -10,7 +10,7 @@ import com.gregtechceu.gtceu.api.machine.multiblock.WorkableElectricMultiblockMa
 import com.gregtechceu.gtceu.api.machine.multiblock.part.MultiblockPartMachine;
 import com.gregtechceu.gtceu.api.machine.trait.recipe.RecipeLogic;
 import com.gregtechceu.gtceu.api.misc.EnergyContainerList;
-import com.gregtechceu.gtceu.api.multiblock.PatternPredicate;
+import com.gregtechceu.gtceu.api.multiblock.MultiPredicate;
 import com.gregtechceu.gtceu.api.multiblock.error.PatternStringError;
 import com.gregtechceu.gtceu.api.sync_system.annotations.SaveField;
 import com.gregtechceu.gtceu.api.sync_system.annotations.SyncToClient;
@@ -164,7 +164,7 @@ public class WEBReceiverMachine extends WorkableElectricMultiblockMachine {
         addEnergyOutputs(frequency, localPowerOutput);
     }
 
-    public static PatternPredicate getHatchPredicates() {
+    public static MultiPredicate getHatchPredicates() {
         return abilities(PartAbility.OUTPUT_ENERGY).setPreviewCount(2)
                 .or(abilities(PartAbility.SUBSTATION_OUTPUT_ENERGY).setPreviewCount(1))
                 .or(abilities(PartAbility.OUTPUT_LASER).setPreviewCount(1));
