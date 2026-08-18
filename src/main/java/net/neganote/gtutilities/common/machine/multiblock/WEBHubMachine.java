@@ -497,12 +497,12 @@ public class WEBHubMachine extends WorkableElectricMultiblockMachine {
         // I should probably make the config values boolean sync handlers so they sync from server,
         // but I cba so now they use the client sided config vals lol
         widgets.add(Text.dynamic(() -> {
-                if(!UtilConfig.coolantEnabled()) return Component.empty();
-                return Component
-                            .translatable("gtmutils.multiblock.web_hub_machine.coolant_usage",
-                                    FormattingUtil.formatNumbers(coolantDrain.getLongValue()),
-                                    UtilMaterials.QuantumCoolant.getLocalizedName());
-                })
+            if (!UtilConfig.coolantEnabled()) return Component.empty();
+            return Component
+                    .translatable("gtmutils.multiblock.web_hub_machine.coolant_usage",
+                            FormattingUtil.formatNumbers(coolantDrain.getLongValue()),
+                            UtilMaterials.QuantumCoolant.getLocalizedName());
+        })
                 .asWidget()
                 .setEnabledIf(w -> everythingUntilNow.get() && UtilConfig.coolantEnabled()));
         widgets.add(Text.of(Component.translatable("gtceu.multiblock.active_transformer.danger_enabled"))
